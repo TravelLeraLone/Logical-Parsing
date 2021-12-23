@@ -12,66 +12,81 @@ ELEMENT = ['Text', 'Picture', 'Icon', 'Button', 'Box']
 ELEMENT_WITH_END = ['Text', 'Picture', 'Icon', 'Button', 'Box', 'End']
 RELATION = ['Under', 'Above', 'Beside', 'Interspersed', 'Surrounding', 'Surrounded']
 OVERALL = ['Page', 'Foreground', 'Background', 'Main', 'Header', 'Footer', 'Sider', 'Floater', 'Complex']
+FUNCTION = ['Informative', 'Navigational', 'Functional', 'Inputting', 'Composite']
 STAGE = [OVERALL, ORGANIZING, ELEMENT, ELEMENT_WITH_END, RELATION]
 
 
 class Asker():
     def __init__(self):
-        self.text = ''
+        self.text = 'Please Select Content Label'
+        self.function = 'Please Select Functional Label'
         self.stage = 0
         self.ind = None
         self.flag = False
         # self.frame = tkinter.Tk()
         # self.v = tkinter.IntVar()
 
-    def ok(self):
+    def _content_label_processing(self):
         self.ind = self.v.get()
-        self.text += STAGE[self.stage][self.ind]
         if self.stage == 0:
             if self.ind != len(OVERALL) - 1:
+                self.text = STAGE[self.stage][self.ind]
                 self.flag = True
             else:
-                self.text = ''
                 self.stage = 1
         elif self.stage == 1:
-            self.text += ' of '
+            self.text = STAGE[self.stage][self.ind] + ' of '
             self.stage = 2
-        elif self.stage == 2:
-            self.text += ' with ('
-            self.stage = 3
-        elif self.stage == 3:
-            if self.ind == len(ELEMENT_WITH_END) - 1:
-                self.flag = True
-                self.text += ')'
-            else:
-                self.text += ' '
-                self.stage = 4
         else:
-            self.text += '), ('
-            self.stage = 3
+            self.text += STAGE[self.stage][self.ind]
+            if self.stage == 2:
+                self.text += ' with ('
+                self.stage = 3
+            elif self.stage == 3:
+                if self.ind == len(ELEMENT_WITH_END) - 1:
+                    self.flag = True
+                    self.text += ')'
+                else:
+                    self.text += ' '
+                    self.stage = 4
+            else:
+                self.text += '), ('
+                self.stage = 3
         self.frame.destroy()
 
-    def ask(self):
+    def _ask(self):
         tkinter.Label(self.frame, text=self.text).pack()
         candidate = STAGE[self.stage]
         for i, l in enumerate(candidate):
             tkinter.Radiobutton(self.frame, text=l, variable=self.v, value=i).pack()
-        tkinter.Button(self.frame, text='OK', command=self.ok).pack()
+        tkinter.Button(self.frame, text='OK', command=self._content_label_processing).pack()
         self.frame.mainloop()
 
-    def generate(self):
+    def _functional_label_processing(self):
+        self.ind = self.v.get()
+        self.function = FUNCTION[self.ind]
+        self.frame.destroy()
+
+    def _generate(self):
         while not self.flag:
             # for widget in self.frame.winfo_children():
             #     widget.destroy()
             self.frame = tkinter.Tk()
             self.v = tkinter.IntVar()
-            self.ask()
+            self._ask()
+        self.frame = tkinter.Tk()
+        self.v = tkinter.IntVar()
+        tkinter.Label(self.frame, text=self.function).pack()
+        for i, l in enumerate(FUNCTION):
+            tkinter.Radiobutton(self.frame, text=l, variable=self.v, value=i).pack()
+        tkinter.Button(self.frame, text='OK', command=self._functional_label_processing).pack()
+        self.frame.mainloop()
 
     @classmethod
     def run(cls):
         asker = cls()
-        asker.generate()
-        return asker.text
+        asker._generate()
+        return asker.text, asker.function
 
 
 def on_mouse(event, x, y, flags, param):
