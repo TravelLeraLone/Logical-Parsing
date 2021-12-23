@@ -102,7 +102,7 @@ def on_mouse(event, x, y, flags, param):
     elif event == cv2.EVENT_LBUTTONUP:  # 左键释放
         point2 = (x, y)
         if point1 != point2:
-            cv2.rectangle(img2, point1, point2, (255, 0, 0), 5)
+            cv2.rectangle(img2, point1, point2, (0, 255, 0), 5)
             cv2.imshow('image', img2)
             label = Asker.run()
             prev_img.append(img.copy())
