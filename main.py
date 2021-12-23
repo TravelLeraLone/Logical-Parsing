@@ -47,7 +47,7 @@ class Asker():
                 self.text += ' '
                 self.stage = 4
         else:
-            self.text += '), '
+            self.text += '), ('
             self.stage = 3
         self.frame.destroy()
 
