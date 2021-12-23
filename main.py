@@ -1,9 +1,77 @@
 import os
 import json
+import tkinter
 import argparse
 from collections import deque
 
 import cv2
+
+
+ORGANIZING = ['Table', 'List', 'Stack', 'Iso']
+ELEMENT = ['Text', 'Picture', 'Icon', 'Button', 'Box']
+ELEMENT_WITH_END = ['Text', 'Picture', 'Icon', 'Button', 'Box', 'End']
+RELATION = ['Under', 'Above', 'Beside', 'Interspersed', 'Surrounding', 'Surrounded']
+OVERALL = ['Page', 'Foreground', 'Background', 'Main', 'Header', 'Footer', 'Sider', 'Floater', 'Complex']
+STAGE = [OVERALL, ORGANIZING, ELEMENT, ELEMENT_WITH_END, RELATION]
+
+
+class Asker():
+    def __init__(self):
+        self.text = ''
+        self.stage = 0
+        self.ind = None
+        self.flag = False
+        # self.frame = tkinter.Tk()
+        # self.v = tkinter.IntVar()
+
+    def ok(self):
+        self.ind = self.v.get()
+        self.text += STAGE[self.stage][self.ind]
+        if self.stage == 0:
+            if self.ind != len(OVERALL) - 1:
+                self.flag = True
+            else:
+                self.text = ''
+                self.stage = 1
+        elif self.stage == 1:
+            self.text += ' of '
+            self.stage = 2
+        elif self.stage == 2:
+            self.text += ' with ('
+            self.stage = 3
+        elif self.stage == 3:
+            if self.ind == len(ELEMENT_WITH_END) - 1:
+                self.flag = True
+                self.text += ')'
+            else:
+                self.text += ' '
+                self.stage = 4
+        else:
+            self.text += '), '
+            self.stage = 3
+        self.frame.destroy()
+
+    def ask(self):
+        tkinter.Label(self.frame, text=self.text).pack()
+        candidate = STAGE[self.stage]
+        for i, l in enumerate(candidate):
+            tkinter.Radiobutton(self.frame, text=l, variable=self.v, value=i).pack()
+        tkinter.Button(self.frame, text='OK', command=self.ok).pack()
+        self.frame.mainloop()
+
+    def generate(self):
+        while not self.flag:
+            # for widget in self.frame.winfo_children():
+            #     widget.destroy()
+            self.frame = tkinter.Tk()
+            self.v = tkinter.IntVar()
+            self.ask()
+
+    @classmethod
+    def run(cls):
+        asker = cls()
+        asker.generate()
+        return asker.text
 
 
 def on_mouse(event, x, y, flags, param):
@@ -19,6 +87,9 @@ def on_mouse(event, x, y, flags, param):
     elif event == cv2.EVENT_LBUTTONUP:  # 左键释放
         point2 = (x, y)
         if point1 != point2:
+            cv2.rectangle(img2, point1, point2, (255, 0, 0), 5)
+            cv2.imshow('image', img2)
+            label = Asker.run()
             prev_img.append(img.copy())
             cv2.rectangle(img, point1, point2, (0, 0, 255), 5)
             cv2.imshow('image', img)
@@ -29,7 +100,8 @@ def on_mouse(event, x, y, flags, param):
             rect = {'x': min_x + curr_rect['x'],
                     'y': min_y + curr_rect['y'],
                     'w': width,
-                    'h': height}
+                    'h': height,
+                    'label': label}
             rects.append(rect)
             q.append((curr_img[min_y:min_y + height, min_x:min_x + width], rect))
     elif event == cv2.EVENT_MBUTTONDOWN:
