@@ -19,7 +19,7 @@ FUNCTION = ['Informative', 'Navigational', 'Functional', 'Inputting', 'Composite
 STAGE = [OVERALL, ORGANIZING, ELEMENT, ELEMENT_WITH_END, RELATION]
 
 
-class Asker():
+class Asker:
     def __init__(self):
         self.text = 'Please Select Content Label'
         self.function = 'Please Select Functional Label'
@@ -160,6 +160,8 @@ args = parser.parse_args()
 global curr_img, prev_img, img, point1, point2, tree, curr_rect, factor, q, parent
 
 if __name__ == '__main__':
+    if not os.path.exists(args.output_dir):
+        os.mkdir(args.output_dir)
     for d, _, fs in os.walk(args.data_dir):
         for f in fs:
             if not f.endswith('.jpg'):
