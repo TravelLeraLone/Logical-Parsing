@@ -10,11 +10,12 @@ from tree import Tree
 from utils import resize_img
 
 
-ORGANIZING = ['Table', 'List', 'Stack', 'Iso']
+ORGANIZING = ['Iso', 'List', 'Table', 'Stack']
 ELEMENT = ['Text', 'Picture', 'Icon', 'Button', 'Box']
 ELEMENT_WITH_END = ['Text', 'Picture', 'Icon', 'Button', 'Box', 'End']
 RELATION = ['Beneath', 'Above', 'Beside', 'Interspersed', 'Surrounding', 'Inside']
-OVERALL = ['Page', 'Foreground', 'Background', 'Main', 'Header', 'Footer', 'Sider', 'Floater', 'Complex']
+OVERALL = ['Complex', 'Page', 'Foreground', 'Background', 'Main', 'Header', 'Footer', 'Sider', 'Floater',
+           'Same as prev']
 FUNCTION = ['Informative', 'Navigational', 'Functional', 'Inputting', 'Composite']
 STAGE = [OVERALL, ORGANIZING, ELEMENT, ELEMENT_WITH_END, RELATION]
 
@@ -32,7 +33,7 @@ class Asker:
     def _content_label_processing(self):
         self.ind = self.v.get()
         if self.stage == 0:
-            if self.ind != len(OVERALL) - 1:
+            if self.ind != 0:
                 self.text = STAGE[self.stage][self.ind]
                 self.flag = True
             else:
@@ -77,13 +78,14 @@ class Asker:
             self.frame = tkinter.Tk()
             self.v = tkinter.IntVar()
             self._ask()
-        self.frame = tkinter.Tk()
-        self.v = tkinter.IntVar()
-        tkinter.Label(self.frame, text=self.function).pack()
-        for i, l in enumerate(FUNCTION):
-            tkinter.Radiobutton(self.frame, text=l, variable=self.v, value=i).pack()
-        tkinter.Button(self.frame, text='OK', command=self._functional_label_processing).pack()
-        self.frame.mainloop()
+        if self.text != 'Same as prev':
+            self.frame = tkinter.Tk()
+            self.v = tkinter.IntVar()
+            tkinter.Label(self.frame, text=self.function).pack()
+            for i, l in enumerate(FUNCTION):
+                tkinter.Radiobutton(self.frame, text=l, variable=self.v, value=i).pack()
+            tkinter.Button(self.frame, text='OK', command=self._functional_label_processing).pack()
+            self.frame.mainloop()
 
     @classmethod
     def run(cls):
@@ -93,7 +95,7 @@ class Asker:
 
 
 def on_mouse(event, x, y, flags, param):
-    global curr_img, prev_img, img, point1, point2, tree, curr_rect, factor, q, parent
+    global curr_img, prev_img, img, point1, point2, tree, curr_rect, factor, q, parent, end_tag
     img2 = img.copy()
     if event == cv2.EVENT_LBUTTONDOWN:  # 左键点击
         point1 = (x, y)
@@ -108,6 +110,8 @@ def on_mouse(event, x, y, flags, param):
             cv2.rectangle(img2, point1, point2, (0, 255, 0), 5)
             cv2.imshow('image', img2)
             label = Asker.run()
+            if label[0] == 'Same as prev':
+                label = q[-1][2].label
             prev_img.append(img.copy())
             cv2.rectangle(img, point1, point2, (0, 0, 255), 5)
             cv2.imshow('image', img)
@@ -121,6 +125,7 @@ def on_mouse(event, x, y, flags, param):
                     'height': height}
             node = tree.add_children(parent, rect, label)
             q.append((curr_img[min_y:min_y + height, min_x:min_x + width], rect, node))
+            end_tag = ord(' ') if q else ord('\r')
     elif event == cv2.EVENT_MBUTTONDOWN:
         img = prev_img.pop()
         cv2.imshow('image', img)
@@ -128,24 +133,51 @@ def on_mouse(event, x, y, flags, param):
         tree.delete_node(del_node)
 
 
+def back():
+    if parent is None:
+        tree.root = None
+        return
+    for child in parent.children:
+        tree.delete_node(child)
+    return
+
+
 def annotate(img_path):
-    global curr_img, prev_img, img, point1, point2, tree, curr_rect, factor, q, parent
+    global curr_img, prev_img, img, point1, point2, tree, curr_rect, factor, q, parent, end_tag
     q = deque()
     temp = cv2.imread(img_path)
     h, w, _ = temp.shape
     tree = Tree((w, h), img_dir=img_path)
     q.append((temp, {'x': 0, 'y': 0, 'width': w, 'height': h}, tree.root))
-    while len(q) != 0:
+    history, key_num = [], -1
+
+    while q:
         prev_img = []
-        if args.dfs:
-            curr_img, curr_rect, parent = q.pop()
+        if key_num != ord('b'):
+            if args.dfs:
+                curr_img, curr_rect, parent = q.pop()
+            else:
+                curr_img, curr_rect, parent = q.popleft()
+            history.append(((curr_img, curr_rect, parent), len(q)))
         else:
-            curr_img, curr_rect, parent = q.popleft()
+            last, length = history.pop()
+            q.appendleft(last)
+            while len(q) > length:
+                q.pop()
+            curr_img, curr_rect, parent = history[-1][0]
+            back()
         img, factor = resize_img(curr_img, args.target_h, args.target_w)
         cv2.namedWindow('image')
         cv2.setMouseCallback('image', on_mouse)
         cv2.imshow('image', img)
-        cv2.waitKey(0)
+
+        end_tag = ord(' ') if q else ord('\r')
+        key_num = cv2.waitKey(0)
+        while key_num != end_tag:
+            if key_num == ord('b'):
+                back()
+                break
+            key_num = cv2.waitKey(0)
     return
 
 
@@ -157,7 +189,7 @@ parser.add_argument('--target_w', type=float, default=540.0)
 parser.add_argument('--dfs', action='store_true')
 args = parser.parse_args()
 
-global curr_img, prev_img, img, point1, point2, tree, curr_rect, factor, q, parent
+global curr_img, prev_img, img, point1, point2, tree, curr_rect, factor, q, parent, end_tag
 
 if __name__ == '__main__':
     if not os.path.exists(args.output_dir):
@@ -171,4 +203,4 @@ if __name__ == '__main__':
             with open(os.path.join(args.output_dir, f.replace('jpg', 'json')), 'w') as w:
                 json.dump(tree.formulate(), w, indent=4)
 
-    tree.show_split()
+    # tree.show_split()
