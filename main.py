@@ -13,7 +13,7 @@ from utils import resize_img
 ORGANIZING = ['Table', 'List', 'Stack', 'Iso']
 ELEMENT = ['Text', 'Picture', 'Icon', 'Button', 'Box']
 ELEMENT_WITH_END = ['Text', 'Picture', 'Icon', 'Button', 'Box', 'End']
-RELATION = ['Under', 'Above', 'Beside', 'Interspersed', 'Surrounding', 'Surrounded']
+RELATION = ['Beneath', 'Above', 'Beside', 'Interspersed', 'Surrounding', 'Surrounded']
 OVERALL = ['Page', 'Foreground', 'Background', 'Main', 'Header', 'Footer', 'Sider', 'Floater', 'Complex']
 FUNCTION = ['Informative', 'Navigational', 'Functional', 'Inputting', 'Composite']
 STAGE = [OVERALL, ORGANIZING, ELEMENT, ELEMENT_WITH_END, RELATION]
