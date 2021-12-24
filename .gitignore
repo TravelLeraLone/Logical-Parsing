@@ -1,5 +1,5 @@
-data
-data/*
+#data
+#data/*
 output
 output/*
 __pycache__
