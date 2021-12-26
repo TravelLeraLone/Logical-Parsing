@@ -5,7 +5,6 @@ import cv2
 
 from utils import resize_img
 
-
 ID_GENERATOR = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'
 LENGTH = 10
 
@@ -39,7 +38,9 @@ class Tree:
                     'width': rect['width'] * origin[0] / 100, 'height': rect['height'] * origin[1] / 100}
 
         def _prepare_kwargs(lsnode):
-            kwargs = {'lsid': lsnode['id'], 'label': lsnode['value']['labels'][0],
+            kwargs = {'lsid': lsnode['id'],
+                      'label': lsnode['value']['labels'][0] if 'labels' in lsnode['value']
+                      else lsnode['value']['rectanglelabels'][0],
                       'rect': _prepare_rect(lsnode['value'], tree.size)}
             if 'meta' not in lsnode:
                 return kwargs
@@ -68,24 +69,26 @@ class Tree:
             node_pool = [item for item in result if item['type'] == 'labels']
             relations = [item for item in result if item['type'] == 'relation']
         else:
-            result = annotation['result']
+            result = annotation  # ['result']
             source = 'pro'
             node_pool = [item for item in result if item['type'] == 'rectanglelabels']
             relations = [item for item in result if item['type'] == 'relation']
-        # base = annotation['data']['image'].replace('\\', '').replace('/data/local-files/?d=mnt/g', '/home/johnzhao/文档/科研')[:-3]
+        # base = annotation['data']['image'].replace('\\', '').replace('/data/local-files/?d=mnt/g',
+        #                                                              '/home/johnzhao/文档/科研')[:-3]
         # rects = json.loads(open(base + 'json'))
         # html = bs(open(html))
         app = {item['id'] for item in node_pool}
 
         root = [item for item in node_pool if 'parentID' not in item or item['parentID'] not in app]
         node_pool = [item for item in node_pool if 'parentID' in item and item['parentID'] in app]
-        if len(root) > 1:
-            last = [item for item in root if
-                    item['value']['labels'][0] in ['Item', 'Attibute', 'Title', 'Value', 'Description', 'Content']]
-            root = [item for item in root if
-                    item['value']['labels'][0] not in ['Item', 'Attibute', 'Title', 'Value', 'Description', 'Content']]
-        else:
-            last = []
+        # if len(root) > 1:
+        #     last = [item for item in root if
+        #             item['value']['labels'][0] in ['Item', 'Attribute', 'Title', 'Value', 'Description', 'Content']]
+        #     root = [item for item in root if
+        #             item['value']['labels'][0] not in ['Item', 'Attibute', 'Title',
+        #                                                'Value', 'Description', 'Content']]
+        # else:
+        #     last = []
         assert len(root) == 1
         root = root[0]
         tree = cls((root['original_width'], root['original_height']))
@@ -116,41 +119,41 @@ class Tree:
         # raise RuntimeError()
 
         # ! last not processed
-        def get_label_nodes():
-            labels2item = []
-            node = tree.root
-            my_stack = []
-            while node or my_stack:
-                if node.label == 'Table':
-                    for child in node.children:
-                        labels2item.append(child)
-                if node.children:
-                    for child in node.children[::-1]:
-                        my_stack.append(child)
-                if my_stack:
-                    node = my_stack.pop()
-                else:
-                    node = None
-            return labels2item
+        # def get_label_nodes():
+        #     labels2item = []
+        #     node = tree.root
+        #     my_stack = []
+        #     while node or my_stack:
+        #         if node.label == 'Table':
+        #             for child in node.children:
+        #                 labels2item.append(child)
+        #         if node.children:
+        #             for child in node.children[::-1]:
+        #                 my_stack.append(child)
+        #         if my_stack:
+        #             node = my_stack.pop()
+        #         else:
+        #             node = None
+        #     return labels2item
 
-        labels2item = get_label_nodes()
-        while len(last) > 0:
-            left, flag = last.pop(), False
-            x = left['value']['x'] * tree.size[0] / 100
-            y = left['value']['y'] * tree.size[1] / 100
-            width = left['value']['width'] * tree.size[0] / 100
-            height = left['value']['height'] * tree.size[1] / 100
-            for node in labels2item:
-                _x = node.rect['x']
-                _y = node.rect['y']
-                _width = node.rect['width']
-                _height = node.rect['height']
-                if x >= _x and y >= _y and \
-                        x + width <= _x + _width and y + height <= _y + _height:
-                    flag = True
-                    tree.add_children(tree.nodes[node.id], **_prepare_kwargs(left))
-            if not flag:
-                raise ValueError()
+        # labels2item = get_label_nodes()
+        # while len(last) > 0:
+        #     left, flag = last.pop(), False
+        #     x = left['value']['x'] * tree.size[0] / 100
+        #     y = left['value']['y'] * tree.size[1] / 100
+        #     width = left['value']['width'] * tree.size[0] / 100
+        #     height = left['value']['height'] * tree.size[1] / 100
+        #     for node in labels2item:
+        #         _x = node.rect['x']
+        #         _y = node.rect['y']
+        #         _width = node.rect['width']
+        #         _height = node.rect['height']
+        #         if x >= _x and y >= _y and \
+        #                 x + width <= _x + _width and y + height <= _y + _height:
+        #             flag = True
+        #             tree.add_children(tree.nodes[node.id], **_prepare_kwargs(left))
+        #     if not flag:
+        #         raise ValueError()
 
         tree.relation = relations
         return tree
@@ -231,20 +234,41 @@ class Tree:
         result += self.relation
         return result
 
-    def show_split(self):
-        img = cv2.imread(self.img_dir)
+    def show_split(self, img_dir=None, h=960, w=540):
+        def _add_rect(rect, base, label):
+            cv2.rectangle(curr_img, (rect['x'] - base['x'], rect['y'] - base['y']),
+                          (rect['x'] - base['x'] + rect['width'], rect['y'] - base['y'] + rect['height']),
+                          (0, 0, 255), 5)
+            if not isinstance(self.root.label, list):
+                label = [label]
+            text_size, baseline = cv2.getTextSize(label[0], cv2.FONT_HERSHEY_SIMPLEX, 1, thickness=2)
+            for i, text in enumerate(label):
+                if text:
+                    draw_point = (rect['x'] - base['x'],
+                                  rect['y'] - base['y'] + (text_size[1] + 2 + baseline) * (i + 1))
+                    cv2.putText(curr_img, text, draw_point, cv2.FONT_HERSHEY_SIMPLEX,
+                                1, (0, 0, 0), thickness=2)
+
+        assert self.img_dir is not None or img_dir is not None
+        img = cv2.imread(self.img_dir) if self.img_dir is not None else cv2.imread(img_dir)
         q = deque()
+        curr_img = img.copy()
+        for k, v in self.root.rect.items():
+            self.root.rect[k] = round(v)
         q.append(self.root)
+        _add_rect(self.root.rect, {'x': 0, 'y': 0}, self.root.label)
+        curr_img, _ = resize_img(curr_img, h, w)
+        cv2.imshow('image', curr_img)
+        cv2.waitKey(0)
         while q:
             node = q.popleft()
-            curr_img = img[node.rect['y']:node.rect['y'] + node.rect['height'],
+            curr_img = img[node.rect['y']: node.rect['y'] + node.rect['height'],
                            node.rect['x']: node.rect['x'] + node.rect['width']].copy()
             for child in node.children:
+                for k, v in child.rect.items():
+                    child.rect[k] = round(v)
                 q.append(child)
-                cv2.rectangle(curr_img, (child.rect['x'] - node.rect['x'], child.rect['y'] - node.rect['y']),
-                              (child.rect['x'] - node.rect['x'] + child.rect['width'],
-                               child.rect['y'] - node.rect['y'] + child.rect['height']),
-                              (0, 0, 255), 5)
-            curr_img, _ = resize_img(curr_img, 960, 540)
+                _add_rect(child.rect, node.rect, child.label)
+            curr_img, _ = resize_img(curr_img, h, w)
             cv2.imshow('image', curr_img)
             cv2.waitKey(0)
