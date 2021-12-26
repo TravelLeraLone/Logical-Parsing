@@ -200,7 +200,8 @@ if __name__ == '__main__':
                 pass
             print('\n\n\nStart new annotating {}'.format(f))
             annotate(os.path.join(d, f))
-            with open(os.path.join(args.output_dir, f.replace('jpg', 'json')), 'w') as w:
-                json.dump(tree.formulate(), w, indent=4)
+            if tree.root is not None:
+                with open(os.path.join(args.output_dir, f.replace('jpg', 'json')), 'w') as w:
+                    json.dump(tree.formulate(), w, indent=4)
 
     # tree.show_split()
