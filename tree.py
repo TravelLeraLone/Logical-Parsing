@@ -236,41 +236,38 @@ class Tree:
 
     def show_split(self, img_dir=None, h=960, w=540):
         def _add_rect(rect, base, label):
-            cv2.rectangle(curr_img, (rect['x'] - base['x'], rect['y'] - base['y']),
-                          (rect['x'] - base['x'] + rect['width'], rect['y'] - base['y'] + rect['height']),
+            cv2.rectangle(curr_img, (round((rect['x'] - base['x']) * factor), round((rect['y'] - base['y']) * factor)),
+                          (round((rect['x'] - base['x'] + rect['width']) * factor),
+                           round((rect['y'] - base['y'] + rect['height']) * factor)),
                           (0, 0, 255), 5)
             if not isinstance(self.root.label, list):
                 label = [label]
-            text_size, baseline = cv2.getTextSize(label[0], cv2.FONT_HERSHEY_SIMPLEX, 1, thickness=2)
+            text_size, baseline = cv2.getTextSize(label[0], cv2.FONT_HERSHEY_SIMPLEX, 0.5, thickness=2)
             for i, text in enumerate(label):
                 if text:
-                    draw_point = (rect['x'] - base['x'],
-                                  rect['y'] - base['y'] + (text_size[1] + 2 + baseline) * (i + 1))
+                    draw_point = (round((rect['x'] - base['x']) * factor),
+                                  round((rect['y'] - base['y']) * factor) + (text_size[1] + 2 + baseline) * (i + 1))
                     cv2.putText(curr_img, text, draw_point, cv2.FONT_HERSHEY_SIMPLEX,
-                                1, (0, 0, 0), thickness=2)
+                                0.5, (0, 0, 0), thickness=2)
 
         assert self.img_dir is not None or img_dir is not None
         img = cv2.imread(self.img_dir) if self.img_dir is not None else cv2.imread(img_dir)
         q = deque()
         curr_img = img.copy()
-        for k, v in self.root.rect.items():
-            self.root.rect[k] = round(v)
+        curr_img, factor = resize_img(curr_img, h, w)
         q.append(self.root)
         _add_rect(self.root.rect, {'x': 0, 'y': 0}, self.root.label)
-        curr_img, _ = resize_img(curr_img, h, w)
         cv2.imshow('image', curr_img)
         cv2.waitKey(0)
         while q:
             node = q.popleft()
-            curr_img = img[node.rect['y']: node.rect['y'] + node.rect['height'],
-                           node.rect['x']: node.rect['x'] + node.rect['width']].copy()
             if not node.children:
                 continue
+            curr_img = img[round(node.rect['y']): round(node.rect['y'] + node.rect['height']),
+                           round(node.rect['x']): round(node.rect['x'] + node.rect['width'])].copy()
+            curr_img, factor = resize_img(curr_img, h, w)
             for child in node.children:
-                for k, v in child.rect.items():
-                    child.rect[k] = round(v)
                 q.append(child)
                 _add_rect(child.rect, node.rect, child.label)
-            curr_img, _ = resize_img(curr_img, h, w)
             cv2.imshow('image', curr_img)
             cv2.waitKey(0)
