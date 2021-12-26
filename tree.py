@@ -264,6 +264,8 @@ class Tree:
             node = q.popleft()
             curr_img = img[node.rect['y']: node.rect['y'] + node.rect['height'],
                            node.rect['x']: node.rect['x'] + node.rect['width']].copy()
+            if not node.children:
+                continue
             for child in node.children:
                 for k, v in child.rect.items():
                     child.rect[k] = round(v)
