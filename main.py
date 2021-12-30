@@ -10,23 +10,28 @@ from tree import Tree
 from utils import resize_img
 
 
-ORGANIZING = ['Iso', 'List', 'Table', 'Stack']
-ELEMENT = ['Text', 'Picture', 'Icon', 'Button', 'Box']
-ELEMENT_WITH_END = ['Text', 'Picture', 'Icon', 'Button', 'Box', 'End']
-RELATION = ['Beneath', 'Above', 'Beside', 'Interspersed', 'Surrounding', 'Inside']
-OVERALL = ['Complex', 'Page', 'Foreground', 'Background', 'Main', 'Header', 'Footer', 'Sider', 'Floater',
-           'Same as prev']
+ORGANIZING = ['Iso', 'List', 'Table', 'Stack', 'Same as prev']
+ELEMENT = ['Text', 'Picture', 'Icon', 'Box']
+ELEMENT_WITH_END = ['Text', 'Picture', 'Icon', 'Box', 'End']
+RELATION = ['Beneath', 'Above', 'Left', 'Right', 'Up', 'Down', 'Interspersed', 'Surrounding', 'Inside']
+OVERALL = ['Complex', 'Foreground', 'Background', 'Main', 'Header', 'Footer', 'Sider', 'Floater', 'Same as prev']
 FUNCTION = ['Informative', 'Navigational', 'Functional', 'Inputting', 'Composite']
 STAGE = [OVERALL, ORGANIZING, ELEMENT, ELEMENT_WITH_END, RELATION]
 
 
 class Asker:
-    def __init__(self):
-        self.text = 'Please Select Content Label'
+    def __init__(self, page=False, skip=False):
+        self.page = page
+        if not self.page:
+            self.text = 'Please Select Content Label'
+        else:
+            self.text = 'Page'
         self.function = 'Please Select Functional Label'
-        self.stage = 0
+        self.skip = skip
+        self.stage = 0 if not self.skip else 1
         self.ind = None
         self.flag = False
+        self.finish = True
         # self.frame = tkinter.Tk()
         # self.v = tkinter.IntVar()
 
@@ -39,6 +44,9 @@ class Asker:
             else:
                 self.stage = 1
         elif self.stage == 1:
+            if self.ind == len(STAGE[self.stage]) - 1:
+                self.text = STAGE[self.stage][self.ind]
+                self.flag = True
             self.text = STAGE[self.stage][self.ind] + ' of '
             self.stage = 2
         else:
@@ -58,7 +66,20 @@ class Asker:
                 self.stage = 3
         self.frame.destroy()
 
+    def _relabel(self):
+        if not self.page:
+            self.text = 'Please Select Content Label'
+        else:
+            self.text = 'Page'
+        self.function = 'Please Select Functional Label'
+        self.stage = 0 if not self.skip else 1
+        self.ind = None
+        self.flag = False
+        self.finish = False
+        self.frame.destroy()
+
     def _ask(self):
+        tkinter.Button(self.frame, text='Relabel', command=self._relabel).pack()
         tkinter.Label(self.frame, text=self.text).pack()
         candidate = STAGE[self.stage]
         for i, l in enumerate(candidate):
@@ -72,30 +93,35 @@ class Asker:
         self.frame.destroy()
 
     def _generate(self):
-        while not self.flag:
-            # for widget in self.frame.winfo_children():
-            #     widget.destroy()
-            self.frame = tkinter.Tk()
-            self.v = tkinter.IntVar()
-            self._ask()
+        if self.text == 'Please Select Content Label':
+            while not self.flag:
+                # for widget in self.frame.winfo_children():
+                #     widget.destroy()
+                self.frame = tkinter.Tk()
+                self.v = tkinter.IntVar()
+                self._ask()
+        self.finish = True
         if self.text != 'Same as prev':
             self.frame = tkinter.Tk()
             self.v = tkinter.IntVar()
+            tkinter.Button(self.frame, text='Relabel', command=self._relabel).pack()
             tkinter.Label(self.frame, text=self.function).pack()
             for i, l in enumerate(FUNCTION):
                 tkinter.Radiobutton(self.frame, text=l, variable=self.v, value=i).pack()
             tkinter.Button(self.frame, text='OK', command=self._functional_label_processing).pack()
             self.frame.mainloop()
+        return self.finish
 
     @classmethod
-    def run(cls):
-        asker = cls()
-        asker._generate()
+    def run(cls, text=None, skip=False):
+        asker = cls(text, skip)
+        while not asker._generate():
+            pass
         return asker.text, asker.function
 
 
 def on_mouse(event, x, y, flags, param):
-    global curr_img, prev_img, img, point1, point2, tree, curr_rect, factor, q, parent, end_tag
+    global curr_img, prev_img, img, point1, point2, tree, curr_rect, factor, q, parent, end_tag, comp
     img2 = img.copy()
     if event == cv2.EVENT_LBUTTONDOWN:  # 左键点击
         point1 = (x, y)
@@ -109,9 +135,14 @@ def on_mouse(event, x, y, flags, param):
         if point1 != point2:
             cv2.rectangle(img2, point1, point2, (0, 255, 0), 5)
             cv2.imshow('image', img2)
-            label = Asker.run()
+            if tree.root is None:
+                label = Asker.run(text='Page')
+            else:
+                label = Asker.run(skip=comp)
             if label[0] == 'Same as prev':
                 label = q[-1][2].label
+            if label[0] not in OVERALL and label[0] != 'Page':
+                comp = True
             prev_img.append(img.copy())
             cv2.rectangle(img, point1, point2, (0, 0, 255), 5)
             cv2.imshow('image', img)
@@ -126,11 +157,6 @@ def on_mouse(event, x, y, flags, param):
             node = tree.add_children(parent, rect, label)
             q.append((curr_img[min_y:min_y + height, min_x:min_x + width], rect, node))
             end_tag = ord(' ') if q else ord('\r')
-    elif event == cv2.EVENT_MBUTTONDOWN:
-        img = prev_img.pop()
-        cv2.imshow('image', img)
-        _, _, del_node = q.pop()
-        tree.delete_node(del_node)
 
 
 def back():
@@ -143,13 +169,13 @@ def back():
 
 
 def annotate(img_path):
-    global curr_img, prev_img, img, point1, point2, tree, curr_rect, factor, q, parent, end_tag
+    global curr_img, prev_img, img, point1, point2, tree, curr_rect, factor, q, parent, end_tag, comp
     q = deque()
     temp = cv2.imread(img_path)
     h, w, _ = temp.shape
     tree = Tree((w, h), img_dir=img_path)
     q.append((temp, {'x': 0, 'y': 0, 'width': w, 'height': h}, tree.root))
-    history, key_num = [], -1
+    history, key_num, comp = [], -1, False
 
     while q:
         prev_img = []
@@ -177,6 +203,12 @@ def annotate(img_path):
             if key_num == ord('b'):
                 back()
                 break
+            if key_num == 8:
+                img = prev_img.pop()
+                cv2.imshow('image', img)
+                _, _, del_node = q.pop()
+                tree.delete_node(del_node)
+            # print(key_num)
             key_num = cv2.waitKey(0)
     return
 
@@ -189,7 +221,7 @@ parser.add_argument('--target_w', type=float, default=540.0)
 parser.add_argument('--dfs', action='store_true')
 args = parser.parse_args()
 
-global curr_img, prev_img, img, point1, point2, tree, curr_rect, factor, q, parent, end_tag
+global curr_img, prev_img, img, point1, point2, tree, curr_rect, factor, q, parent, end_tag, comp
 
 if __name__ == '__main__':
     if not os.path.exists(args.output_dir):
